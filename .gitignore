@@ -1,0 +1,7 @@
+# ignore these files
+*~
+*.swp
+# Directories
+__pycache__
+PicoNuclear.egg-info
+build
