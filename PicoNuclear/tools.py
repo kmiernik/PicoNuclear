@@ -59,6 +59,15 @@ def load_configuration(file_name):
         configuration['captures'] = get_number(
                                     samples.getAttribute('captures'), 1, 'int')
 
+        configuration['ch_range'] = get_number(
+                                samples.getAttribute('ch_range'), 1024, 'int')
+        configuration['ch_bins'] = get_number(
+                                samples.getAttribute('ch_bins'), 1024, 'int')
+        configuration['t_range'] = get_number(
+                                samples.getAttribute('t_range'), 100, 'int')
+        configuration['t_bins'] = get_number(
+                                samples.getAttribute('t_bins'), 200, 'int')
+
         trigger = hardware.getElementsByTagName('trigger')[0]
         configuration['trigger'] = {
                 'source' : trigger.getAttribute('source').upper(),

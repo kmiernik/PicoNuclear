@@ -26,9 +26,12 @@ if __name__ == '__main__':
                   threshold=config['trigger']['threshold'],
                   direction=config['trigger']['direction'], 
                   auto_trigger=config['trigger']['autotrigger'])
+    print('# Interval is', s.get_interval_from_timebase(config['timebase'], 
+        config['pre'] + config['post']), 'ns')
 
-    t, [A, B] = s.measure(config['pre'], config['post'],
-            num_captures=config['captures'], timebase=config['timebase'])
+    t, [A, B] = s.measure_relative_adc(config['pre'], config['post'],
+            num_captures=config['captures'], timebase=config['timebase'], 
+            inverse=True)
 
     s.close()
 

@@ -7,7 +7,6 @@ import PicoNuclear.tools as tools
 from PicoNuclear.pico3000a import PicoScope3000A
 from scipy.optimize import curve_fit
 
-
 def E(x, calib):
     r = 0
     for i, c in enumerate(calib):
@@ -18,6 +17,53 @@ def E(x, calib):
 def gaussian(x, x0, s, A): 
     return (A / numpy.sqrt(2 * numpy.pi * s**2) * 
             numpy.exp(-(x-x0)**2 / (2 * s**2)))
+
+
+def update_plots(axes, all_lines, good_lines, all_list, good_list, 
+        ch_range, ch_bins, t_range, t_bins):
+    all_data = numpy.array(all_list)
+    good_data = numpy.array(good_list)
+    bins, edges = numpy.histogram(all_data[:, 3] - all_data[:, 2], 
+            range=(-t_range, t_range), bins=t_bins)
+    all_lines[0][0].set_ydata(bins)
+    all_lines[0][0].set_xdata(edges[:-1])
+    axes[0][0].set_ylim(0, max(bins) * 1.1)
+    if len(good_data > 0):
+        bins, edges = numpy.histogram(good_data[:, 3] - good_data[:, 2],
+                range=(-t_range, t_range), bins=t_bins)
+        good_lines[0][0].set_ydata(bins)
+        good_lines[0][0].set_xdata(edges[:-1])
+
+    all_lines[1][1].set_ydata(all_data[:, 1])
+    all_lines[1][1].set_xdata(all_data[:, 0])
+    if len(good_data > 0):
+        good_lines[1][1].set_ydata(good_data[:, 1])
+        good_lines[1][1].set_xdata(good_data[:, 0])
+    
+    bins, edges = numpy.histogram(all_data[:, 0], range=(0, ch_range),
+            bins=ch_bins)
+    all_lines[0][1].set_ydata(bins)
+    all_lines[0][1].set_xdata(edges[:-1])
+    axes[0][1].set_ylim(0, max(bins[100:]))
+    if len(good_data > 0):
+        bins, edges = numpy.histogram(good_data[:, 0], range=(0, ch_range),
+                        bins=ch_bins)
+        good_lines[0][1].set_ydata(bins)
+        good_lines[0][1].set_xdata(edges[:-1])
+
+    bins, edges = numpy.histogram(all_data[:, 1], range=(0, ch_range),
+                        bins=ch_bins)
+    all_lines[1][0].set_ydata(bins)
+    all_lines[1][0].set_xdata(edges[:-1])
+    axes[1][0].set_ylim(0, max(bins[100:]))
+    if len(good_data > 0):
+        bins, edges = numpy.histogram(good_data[:, 1], range=(0, ch_range),
+                        bins=ch_bins)
+        good_lines[1][0].set_ydata(bins)
+        good_lines[1][0].set_xdata(edges[:-1])
+
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
 
 
@@ -41,7 +87,45 @@ if __name__ == '__main__':
     if args.t < 0 and args.n < 0:
         t_max = 5.0
 
+    t_update = 2.0
+
     config = tools.load_configuration(args.config)
+
+    plt.ion()
+    fig, axes = plt.subplots(2, 2)
+
+    all00, = axes[0][0].plot([], [], ds='steps-mid', color='black')
+    good00, = axes[0][0].plot([], [], ds='steps-mid', color='red')
+    axes[0][0].set_xlim(-config['t_range'], config['t_range'])
+    time_text = axes[0][0].text(1.0, 0.9, '', fontsize=14, color='red')
+    axes[0][0].set_xlabel('$\Delta t$')
+
+    all11, = axes[1][1].plot([], [], 's', mfc='None', color='Black')
+    good11, = axes[1][1].plot([], [], 'o', color='Red')
+    axes[1][1].set_xlabel('Ch A')
+    axes[1][1].set_ylabel('Ch B')
+    axes[1][1].set_xlim(0, config['ch_range'])
+    axes[1][1].set_ylim(0, config['ch_range'])
+
+    all01, = axes[0][1].plot([], [], ds='steps-mid', color='black')
+    good01, = axes[0][1].plot([], [], ds='steps-mid', color='blue')
+    axes[0][1].set_xlabel('Ch A')
+    axes[0][1].set_xlim(0, config['ch_range'])
+
+    all10, = axes[1][0].plot([], [], ds='steps-mid', color='black')
+    good10, = axes[1][0].plot([], [], ds='steps-mid', color='red')
+    axes[1][0].set_xlabel('Ch B')
+    axes[1][0].set_xlim(0, config['ch_range'])
+
+    fig.set_size_inches(12, 9)
+    fig.tight_layout()
+
+    fig.canvas.draw()
+    fig.canvas.flush_events()
+
+    lines_all = [[all00, all01], [all10, all11]]
+    lines_good = [[good00, good01], [good10, good11]]
+
 
     header = '* Config:\n'
     header += '\t t_max = {:.3f} s, n_max = {}\n'.format(t_max, n_max)
@@ -72,17 +156,21 @@ if __name__ == '__main__':
 
     all_data = []
     good_data = []
+    t_plot = datetime.datetime.now()
     while True:
         try:
-            t, [A, B] = s.measure(config['pre'], config['post'],
+            t, [A, B] = s.measure_relative_adc(config['pre'], config['post'],
                                   num_captures=config['captures'],
-                                  timebase=config['timebase'])
+                                  timebase=config['timebase'], 
+                                  inverse=True)
             for i, Ai in enumerate(A):
                 xa = tools.amplitude(A[i, :], config['A']['filter'])
                 xb = tools.amplitude(B[i, :], config['B']['filter'])
 
-                ta = tools.zero_crossing(A[i, :], config['A']['filter']['B'])
-                tb = tools.zero_crossing(B[i, :], config['B']['filter']['B'])
+                ta = tools.zero_crossing(A[i, :], config['A']['filter']['B'], 
+                        falling=False)
+                tb = tools.zero_crossing(B[i, :], config['B']['filter']['B'], 
+                        falling=False)
 
                 Ea = E(xa, config['A']['calib'])
                 Eb = E(xb, config['B']['calib'])
@@ -92,7 +180,16 @@ if __name__ == '__main__':
                         and
                     config['B']['window'][0] <= Eb <= config['B']['window'][1]):
                     good_data.append([Ea, Eb, ta, tb])
-            dt = (datetime.datetime.now() - t0).total_seconds()
+            tnow = datetime.datetime.now()
+            dt = (tnow - t0).total_seconds()
+            dt_plot = (tnow - t_plot).total_seconds()
+            if dt_plot > t_update:
+                update_plots(axes, lines_all, lines_good, all_data, good_data,
+                        config['ch_range'], config['ch_bins'],
+                        config['t_range'], config['t_bins'])
+                time_text.set_text('t = {:.1f} s'.format(dt))
+                time_text.set_x(axes[0][0].get_xlim()[0] + 1.0)
+                time_text.set_y(axes[0][0].get_ylim()[1] * 0.9)
             if t_max > 0:
                 if n_max < 0:
                     if args.verbose:
@@ -119,7 +216,6 @@ if __name__ == '__main__':
     footer += '* Total good events: {}\n'.format(len(good_data))
 
     print(footer)
-
     s.close()
 
     all_data = numpy.array(all_data)
@@ -135,73 +231,67 @@ if __name__ == '__main__':
         numpy.savetxt(out_file_name, all_data, fmt='%.3f', header=header,
                 footer=footer, delimiter=' ')
 
-    fig, axes = plt.subplots(2, 2)
 
-    bins, edges = numpy.histogram(all_data[:, 3] - all_data[:, 2], bins=1000)
-    axes[0][0].plot(edges[:-1], bins, ds='steps-mid', color='black')
+    update_plots(axes, lines_all, lines_good, all_data, good_data,
+            config['ch_range'], config['ch_bins'],
+            config['t_range'], config['t_bins'])
+
     if len(good_data > 0):
         bins, edges = numpy.histogram(good_data[:, 3] - good_data[:, 2],
-                bins=1000)
-        t0 = edges[numpy.argmax(bins)] 
-        popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
-                                p0 = [t0, t0 * 0.05, len(good_data)])
-        axes[0][0].plot(edges[:-1], bins, ds='steps-mid', color='red')
-        xf = numpy.linspace(edges[0], edges[-1], 10000)
-        axes[0][0].plot(xf, gaussian(xf, *popt), ls='--', color='orange')
-        print('* dT:')
-        print('      t0 = {0[0]:.2f}, s = {0[1]:.3f} A = {0[2]:.1f}'
-                .format(popt))
+                bins=config['t_bins'], 
+                range=(-config['t_range'], config['t_range']))
+        try:
+            t0 = edges[numpy.argmax(bins)] 
+            popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
+                                    p0 = [t0, 1.0, len(good_data)])
+            xf = numpy.linspace(edges[0], edges[-1], 10000)
+            axes[0][0].plot(xf, gaussian(xf, *popt), ls='--', color='orange')
+            print('* dT:')
+            print('      t0 = {0[0]:.2f}, s = {0[1]:.3f} A = {0[2]:.1f}'
+                    .format(popt))
+        except RuntimeError:
+            print('* dT: could not fit selected data')
+            pass
 
-    max_A = max(all_data[:, 0])
-    max_B = max(all_data[:, 1])
-    ch_range = [0, int(max(max_A, max_B)) + 1]
-    n_bins = 8192 if ch_range[1] > 8192 else ch_range[1]
-
-    axes[1][1].plot(all_data[:, 0], all_data[:, 1], 's', 
-            mfc='None', color='Black')
-    if len(good_data > 0):
-        axes[1][1].plot(good_data[:, 0], good_data[:, 1], 'o', 
-                mfc='None', color='Red')
-    axes[1][1].set_xlabel('Ch A')
-    axes[1][1].set_ylabel('Ch B')
-    axes[1][1].set_xlim(0, ch_range[1])
-    axes[1][1].set_ylim(0, ch_range[1])
-
-    bins, edges = numpy.histogram(all_data[:, 0], range=ch_range, 
-            bins=n_bins)
-    axes[0][1].plot(edges[:-1], bins, ds='steps-mid', color='black')
-    if len(good_data > 0):
-        bins, edges = numpy.histogram(good_data[:, 0], range=ch_range, 
-                        bins=n_bins)
+        bins, edges = numpy.histogram(good_data[:, 0], 
+                range=(0, config['ch_range']), bins=config['ch_bins'])
         x0 = edges[numpy.argmax(bins)] 
-        popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
-                                p0 = [x0, x0 * 0.05, len(good_data)])
-        xf = numpy.linspace(ch_range[0], ch_range[1], 
-                            (ch_range[1] - ch_range[0]) * 10)
-        axes[0][1].plot(edges[:-1], bins, ds='steps-mid', color='blue')
-        axes[0][1].plot(xf, gaussian(xf, *popt), ls='--', color='violet')
-        print('* CH A:')
-        print('      x0 = {0[0]:.2f} s = {0[1]:.3f} A = {0[2]:.1f}'
-                .format(popt))
-    axes[0][1].set_xlabel('Ch A')
+        xf = numpy.linspace(0, config['ch_range'], config['ch_range'] * 10)
+        try:
+            popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
+                                    p0 = [x0, x0 * 0.05, len(good_data)])
+            axes[0][1].plot(edges[:-1], bins, ds='steps-mid', color='blue')
+            axes[0][1].plot(xf, gaussian(xf, *popt), ls='--', color='violet')
+            print('* CH A:')
+            print('      x0 = {0[0]:.2f} s = {0[1]:.3f} A = {0[2]:.1f}'
+                    .format(popt))
+        except RuntimeError:
+            print('* CH A: could not fit selected data')
+            pass
 
-    bins, edges = numpy.histogram(all_data[:, 1], range=ch_range, 
-                        bins=n_bins)
-    axes[1][0].plot(edges[:-1], bins, ds='steps-mid', color='black')
-    if len(good_data > 0):
-        bins, edges = numpy.histogram(good_data[:, 1], range=ch_range, 
-                        bins=n_bins)
-        x0 = edges[numpy.argmax(bins)] 
-        popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
-                                p0 = [x0, x0 * 0.05, len(good_data)])
-        axes[1][0].plot(edges[:-1], bins, ds='steps-mid', color='red')
-        axes[1][0].plot(xf, gaussian(xf, *popt), ls='--', color='orange')
-        print('* CH B:')
-        print('      x0 = {0[0]:.2f} s = {0[1]:.3f} A = {0[2]:.1f}'.
-                format(popt))
-    axes[1][0].set_xlabel('Ch B')
+        bins, edges = numpy.histogram(good_data[:, 1],
+                range=(0, config['ch_range']), bins=config['ch_bins'])
+        try:
+            x0 = edges[numpy.argmax(bins)] 
+            popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
+                                    p0 = [x0, x0 * 0.05, len(good_data)])
+            axes[1][0].plot(edges[:-1], bins, ds='steps-mid', color='red')
+            axes[1][0].plot(xf, gaussian(xf, *popt), ls='--', color='orange')
+            print('* CH B:')
+            print('      x0 = {0[0]:.2f} s = {0[1]:.3f} A = {0[2]:.1f}'.
+                    format(popt))
+        except RuntimeError:
+            print('* CH B: could not fit selected data')
+            pass
 
-    fig.set_size_inches(9, 9)
-    fig.tight_layout()
-    plt.show()
+    fig.canvas.draw()
+    fig.canvas.flush_events()
 
+    print('Press any key to exit')
+    try:
+        while True:
+            key = fig.waitforbuttonpress(1)
+            if key:
+                break
+    except KeyboardInterrupt:
+        print('Done')

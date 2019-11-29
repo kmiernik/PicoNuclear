@@ -225,6 +225,39 @@ class PicoScope3000A:
         self.stop()
         return values
 
+    def measure_relative_adc(self, num_pre_samples, num_post_samples,
+            timebase=1, num_captures=1, inverse=False):
+        """Start a data collection run and return the data.
+
+        Start a data collection run and collect a number of captures. The data
+        is returned as a twodimensional NumPy array (i.e. a 'list' of captures)
+        with data values in ADC relative values in range 0-1. 
+        An array of time values in nanoseconds is also returned.
+
+        :param num_pre_samples: number of samples before the trigger
+        :param num_post_samples: number of samples after the trigger
+        :param timebase: timebase setting (see programmers guide for reference)
+        :param num_captures: number of captures to take
+
+        :returns: time_values, data
+        """
+        data = self.measure_adc_values(num_pre_samples, num_post_samples,
+                                       timebase, num_captures)
+
+        num_samples = num_pre_samples + num_post_samples
+        time_values = self._calculate_time_values(timebase, num_samples)
+
+        V_data = []
+        for channel, values in zip(self._channels_enabled, data):
+            if self._channels_enabled[channel] is True:
+                V_data.append(self._rescale_adc_to_1(channel,
+                                                     np.array(values), 
+                                                     inverse))
+            else:
+                V_data.append(None)
+
+        return time_values, V_data
+
     def set_up_buffers(self, num_samples, num_captures=1):
         """Set up memory buffers for reading data from device.
 
@@ -278,6 +311,20 @@ class PicoScope3000A:
         offset = self._input_offsets[channel]
         max_adc_value = self._input_adc_ranges[channel]
         return (voltage_range * data) / max_adc_value - offset
+
+    def _rescale_adc_to_1(self, channel, data, inverse):
+        """Rescale the ADC data to 0-1 range and return float values.
+
+        :param channel: name of the channel
+        :param data: the data to transform
+        """
+        voltage_range = self._input_voltage_ranges[channel]
+        offset = self._input_offsets[channel]
+        max_adc_value = self._input_adc_ranges[channel]
+        if inverse:
+            return (max_adc_value - data) / max_adc_value
+        else:
+            return data / max_adc_value
 
     def _rescale_V_to_adc(self, channel, data):
         """Rescale float values in volts to ADC values.
