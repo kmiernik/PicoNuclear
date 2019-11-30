@@ -130,22 +130,28 @@ def load_configuration(file_name):
     return configuration
 
 
-def trapezoidal(v, k, m, tau):
+def trapezoidal(v, params, clock):
+    b = params['B']
+    k = params['L']
+    m = params['G']
+    tau = params['tau']
+
+    base = v[0:b].sum() / b
     N = len(v)
     d = numpy.zeros(N)
     p = numpy.zeros(N)
     r = numpy.zeros(N)
     s = numpy.zeros(N)
     l = k + m
-    M = 1 / (numpy.exp(1 / tau) - 1)
+    M = 1 / (numpy.exp(clock / tau) - 1)
 
-    d[0] = v[0]
+    d[0] = v[0] - base
     p[0] = d[0]
     r[0] = p[0] + M * d[0]
     s[0] = r[0]
 
     for n in range(1, k):
-        d[n] = v[n]
+        d[n] = v[n] - base
         p[n] = p[n-1] + d[n]
         r[n] = p[n] + M * d[n]
         s[n] = s[n-1] + r[n]
@@ -157,7 +163,7 @@ def trapezoidal(v, k, m, tau):
         s[n] = s[n-1] + r[n]
 
     for n in range(l, l + k):
-        d[n] = v[n] - v[n-k] - v[n-l]
+        d[n] = v[n] - v[n-k] - v[n-l] + base
         p[n] = p[n-1] + d[n]
         r[n] = p[n] + M * d[n]
         s[n] = s[n-1] + r[n]
@@ -200,9 +206,9 @@ def zero_crossing(trace, base=15, shift=10, chi=0.6, falling=True):
 
 
 
-def amplitude(s, params, method='trapezoidal'):
+def amplitude(s, params, clock, method='trapezoidal'):
     if params['method'] == 'trapezoidal':
-        A, sa = trapezoidal(s, params['L'], params['G'], params['tau'])
+        A, sa = trapezoidal(s, params, clock)
     else:
         baseline = s[0:params['B']].sum() / params['B']
         if params['method'] == 'sum':

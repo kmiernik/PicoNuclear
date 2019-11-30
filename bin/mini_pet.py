@@ -148,6 +148,9 @@ if __name__ == '__main__':
                   direction=config['trigger']['direction'], 
                   auto_trigger=config['trigger']['autotrigger'])
 
+    clock = s.get_interval_from_timebase(config['timebase'], 
+                                         config['pre'] + config['post'])
+
     t0 = datetime.datetime.now()
     dt = (datetime.datetime.now() - t0).total_seconds()
 
@@ -164,8 +167,8 @@ if __name__ == '__main__':
                                   timebase=config['timebase'], 
                                   inverse=True)
             for i, Ai in enumerate(A):
-                xa = tools.amplitude(A[i, :], config['A']['filter'])
-                xb = tools.amplitude(B[i, :], config['B']['filter'])
+                xa = tools.amplitude(A[i, :], config['A'], clock)
+                xb = tools.amplitude(B[i, :], config['B'], clock)
 
                 ta = tools.zero_crossing(A[i, :], config['A']['filter']['B'], 
                         falling=False)
