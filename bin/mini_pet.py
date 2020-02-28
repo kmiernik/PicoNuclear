@@ -155,6 +155,7 @@ if __name__ == '__main__':
     dt = (datetime.datetime.now() - t0).total_seconds()
 
     header += 'Start at {}\n'.format(t0)
+    header += 'EA  EB  tA  tB'
     print('* Start at', t0)
 
     all_data = []
@@ -293,7 +294,7 @@ if __name__ == '__main__':
     print('Press any key to exit')
     try:
         while True:
-            key = fig.waitforbuttonpress(1)
+            key = fig.waitforbuttonpress(10)
             if key:
                 break
     except KeyboardInterrupt:
