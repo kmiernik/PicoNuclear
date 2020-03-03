@@ -61,12 +61,8 @@ def load_configuration(file_name):
 
         configuration['ch_range'] = get_number(
                                 samples.getAttribute('ch_range'), 1024, 'int')
-        configuration['ch_bins'] = get_number(
-                                samples.getAttribute('ch_bins'), 1024, 'int')
         configuration['t_range'] = get_number(
                                 samples.getAttribute('t_range'), 100, 'int')
-        configuration['t_bins'] = get_number(
-                                samples.getAttribute('t_bins'), 200, 'int')
 
         trigger = hardware.getElementsByTagName('trigger')[0]
         configuration['trigger'] = {
@@ -77,7 +73,6 @@ def load_configuration(file_name):
                 'autotrigger': get_number(trigger.getAttribute('autotrigger'),
                                         0, 'int')
                 }
-
 
         channels = hardware.getElementsByTagName('channel')
         for ch in channels:

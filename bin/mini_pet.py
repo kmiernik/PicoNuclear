@@ -20,17 +20,17 @@ def gaussian(x, x0, s, A):
 
 
 def update_plots(axes, all_lines, good_lines, all_list, good_list, 
-        ch_range, ch_bins, t_range, t_bins):
+        ch_range, t_range):
     all_data = numpy.array(all_list)
     good_data = numpy.array(good_list)
     bins, edges = numpy.histogram(all_data[:, 3] - all_data[:, 2], 
-            range=(-t_range, t_range), bins=t_bins)
+            range=(-t_range, t_range), bins=2 * t_range)
     all_lines[0][0].set_ydata(bins)
     all_lines[0][0].set_xdata(edges[:-1])
     axes[0][0].set_ylim(0, max(bins) * 1.1)
     if len(good_data > 0):
         bins, edges = numpy.histogram(good_data[:, 3] - good_data[:, 2],
-                range=(-t_range, t_range), bins=t_bins)
+                range=(-t_range, t_range), bins= 2 * t_range)
         good_lines[0][0].set_ydata(bins)
         good_lines[0][0].set_xdata(edges[:-1])
 
@@ -41,24 +41,24 @@ def update_plots(axes, all_lines, good_lines, all_list, good_list,
         good_lines[1][1].set_xdata(good_data[:, 0])
     
     bins, edges = numpy.histogram(all_data[:, 0], range=(0, ch_range),
-            bins=ch_bins)
+            bins=ch_range)
     all_lines[0][1].set_ydata(bins)
     all_lines[0][1].set_xdata(edges[:-1])
     axes[0][1].set_ylim(0, max(bins[100:]))
     if len(good_data > 0):
         bins, edges = numpy.histogram(good_data[:, 0], range=(0, ch_range),
-                        bins=ch_bins)
+                        bins=ch_range)
         good_lines[0][1].set_ydata(bins)
         good_lines[0][1].set_xdata(edges[:-1])
 
     bins, edges = numpy.histogram(all_data[:, 1], range=(0, ch_range),
-                        bins=ch_bins)
+                        bins=ch_range)
     all_lines[1][0].set_ydata(bins)
     all_lines[1][0].set_xdata(edges[:-1])
     axes[1][0].set_ylim(0, max(bins[100:]))
     if len(good_data > 0):
         bins, edges = numpy.histogram(good_data[:, 1], range=(0, ch_range),
-                        bins=ch_bins)
+                        bins=ch_range)
         good_lines[1][0].set_ydata(bins)
         good_lines[1][0].set_xdata(edges[:-1])
 
@@ -189,8 +189,7 @@ if __name__ == '__main__':
             dt_plot = (tnow - t_plot).total_seconds()
             if dt_plot > t_update:
                 update_plots(axes, lines_all, lines_good, all_data, good_data,
-                        config['ch_range'], config['ch_bins'],
-                        config['t_range'], config['t_bins'])
+                        config['ch_range'], config['t_range'])
                 time_text.set_text('t = {:.1f} s'.format(dt))
                 time_text.set_x(axes[0][0].get_xlim()[0] + 1.0)
                 time_text.set_y(axes[0][0].get_ylim()[1] * 0.9)
@@ -237,12 +236,11 @@ if __name__ == '__main__':
 
 
     update_plots(axes, lines_all, lines_good, all_data, good_data,
-            config['ch_range'], config['ch_bins'],
-            config['t_range'], config['t_bins'])
+            config['ch_range'], config['t_range'])
 
     if len(good_data > 0):
         bins, edges = numpy.histogram(good_data[:, 3] - good_data[:, 2],
-                bins=config['t_bins'], 
+                bins=2 * config['t_range'],
                 range=(-config['t_range'], config['t_range']))
         try:
             t0 = edges[numpy.argmax(bins)] 
@@ -258,7 +256,7 @@ if __name__ == '__main__':
             pass
 
         bins, edges = numpy.histogram(good_data[:, 0], 
-                range=(0, config['ch_range']), bins=config['ch_bins'])
+                range=(0, config['ch_range']), bins=config['ch_range'])
         x0 = edges[numpy.argmax(bins)] 
         xf = numpy.linspace(0, config['ch_range'], config['ch_range'] * 10)
         try:
@@ -274,7 +272,7 @@ if __name__ == '__main__':
             pass
 
         bins, edges = numpy.histogram(good_data[:, 1],
-                range=(0, config['ch_range']), bins=config['ch_bins'])
+                range=(0, config['ch_range']), bins=config['ch_range'])
         try:
             x0 = edges[numpy.argmax(bins)] 
             popt, pcon = curve_fit(gaussian, edges[:-1] + 0.5, bins, 
