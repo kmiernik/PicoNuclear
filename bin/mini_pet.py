@@ -168,8 +168,8 @@ if __name__ == '__main__':
                                   timebase=config['timebase'], 
                                   inverse=True)
             for i, Ai in enumerate(A):
-                xa = tools.amplitude(A[i, :], config['A'], clock)
-                xb = tools.amplitude(B[i, :], config['B'], clock)
+                xa = tools.amplitude(A[i, :], config['A']['filter'], clock)
+                xb = tools.amplitude(B[i, :], config['B']['filter'], clock)
 
                 ta = tools.zero_crossing(A[i, :], config['A']['filter']['B'], 
                         falling=False)

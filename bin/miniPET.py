@@ -5,6 +5,7 @@ import pandas
 import sys
 
 import matplotlib.pyplot as plt
+import PicoNuclear
 import PicoNuclear.tools as tools
 
 from scipy.optimize import curve_fit
@@ -34,6 +35,10 @@ class ConfigWindow(QDialog):
         self.button_done = QPushButton('Done')
         self.button_done.setFixedWidth(100)
         self.button_done.clicked.connect(self.done_clicked)
+
+        self.button_default = QPushButton('Default')
+        self.button_default.setFixedWidth(100)
+        self.button_default.clicked.connect(self.default_clicked)
 
         self.button_cancel = QPushButton('Cancel')
         self.button_cancel.setFixedWidth(100)
@@ -331,7 +336,8 @@ class ConfigWindow(QDialog):
 
         layout.addWidget(hline2, 22, 0, 1, 3)
 
-        layout.addWidget(self.button_done, 23, 1)
+        layout.addWidget(self.button_done, 23, 0)
+        layout.addWidget(self.button_default, 23, 1)
         layout.addWidget(self.button_cancel, 23, 2)
 
         self.setLayout(layout)
@@ -384,6 +390,13 @@ class ConfigWindow(QDialog):
 
 
     def cancel_clicked(self):
+        self.close()
+
+
+    def default_clicked(self):
+        default_config = os.path.join(PicoNuclear.__path__[0], 'config', 
+                'default.xml')
+        self.config = tools.load_configuration(default_config)
         self.close()
 
 
@@ -487,7 +500,10 @@ class Window(QMainWindow):
         self.finish = False
         self.status = 'Ready'
         self.data = None
-        self.config = tools.load_configuration('../docs/config_example.xml')
+        default_config = os.path.join(PicoNuclear.__path__[0], 'config', 
+                'default.xml')
+        self.config = tools.load_configuration(default_config)
+
         self.calib = {
                             'A' : [0, 1],
                             'B' : [0, 1]
@@ -499,8 +515,22 @@ class Window(QMainWindow):
 
         self.path_name = os.path.expanduser('~')
 
-        # Load default configuration from default path
-        #self.config = tools.load_configuration('')
+        self.s = PicoScope3000A()
+
+        self.s.set_channel('A', coupling_type=self.config['A']['coupling'], 
+                range_value=self.config['A']['range'], 
+                offset=self.config['A']['offset'])
+        self.s.set_channel('B', coupling_type=self.config['B']['coupling'],
+                range_value=self.config['B']['range'], 
+                offset=self.config['B']['offset'])
+        self.s.set_trigger(self.config['trigger']['source'],
+                    threshold=self.config['trigger']['threshold'],
+                    direction=self.config['trigger']['direction'], 
+                    auto_trigger=self.config['trigger']['autotrigger'])
+
+        self.clock = self.s.get_interval_from_timebase(
+                self.config['timebase'], 
+                self.config['pre'] + self.config['post'])
 
         self.initUI()
 
@@ -597,7 +627,7 @@ class Window(QMainWindow):
         self.input_a1 = QLineEdit()
         self.input_a1.setFixedWidth(70)
         self.input_a1.setAlignment(Qt.AlignLeft)
-        self.input_a1.setText('100')
+        self.input_a1.setText('0')
         self.input_a1.setValidator(self.onlyInt)
 
         self.label_b0 = QLabel()
@@ -619,7 +649,7 @@ class Window(QMainWindow):
         self.input_b1 = QLineEdit()
         self.input_b1.setFixedWidth(70)
         self.input_b1.setAlignment(Qt.AlignLeft)
-        self.input_b1.setText('100')
+        self.input_b1.setText('0')
         self.input_b1.setValidator(self.onlyInt)
 
         self.button_count = QPushButton('Sum')
@@ -769,17 +799,17 @@ class Window(QMainWindow):
         b0 = int(self.input_b0.text())
         b1 = int(self.input_b1.text())
 
-        df = pandas.DataFrame(self.data, columns=['A', 'B'])
+        df = pandas.DataFrame(self.data, columns=['A', 'B', 'tA', 'tB'])
         good = df[df.A >= a0][df.A <= a1][df.B >= b0][df.B <= b1]
         self.count_input.setText('{}'.format(good.shape[0]))
 
-        bins, edges = numpy.histogram(df.B - df.A, 
+        bins, edges = numpy.histogram(df.tB - df.tA, 
                 range=self.t_range, bins=self.t_bins)
         self.data00.set_ydata(bins)
         self.data00.set_xdata(edges[:-1])
-        self.axes[0][0].set_ylim(0, max(bins) * 1.1)
+        self.axes[0][0].set_ylim(0, max(bins[5:]) * 1.1)
 
-        bins, edges = numpy.histogram(good.B - good.A, 
+        bins, edges = numpy.histogram(good.tB - good.tA, 
                 range=self.t_range, bins=self.t_bins)
         self.data00g.set_ydata(bins)
         self.data00g.set_xdata(edges[:-1])
@@ -789,7 +819,7 @@ class Window(QMainWindow):
         self.data01.set_ydata(bins)
         self.data01.set_xdata(edges[:-1] * self.calib['A'][1] 
                               + self.calib['A'][0])
-        self.axes[0][1].set_ylim(0, max(bins) * 1.1)
+        self.axes[0][1].set_ylim(0, max(bins[5:]) * 1.1)
 
         bins, edges = numpy.histogram(good.A, range=self.ch_range, 
                 bins=self.ch_bins)
@@ -802,7 +832,7 @@ class Window(QMainWindow):
         self.data10.set_ydata(bins)
         self.data10.set_xdata(edges[:-1] * self.calib['B'][1] 
                               + self.calib['B'][0])
-        self.axes[1][0].set_ylim(0, max(bins) * 1.1)
+        self.axes[1][0].set_ylim(0, max(bins[5:]) * 1.1)
 
         bins, edges = numpy.histogram(good.B, range=self.ch_range, 
                 bins=self.ch_bins)
@@ -819,6 +849,7 @@ class Window(QMainWindow):
 
 
     def start(self):
+        t_update = 1.0
         self.status = 'Measuring'
         self.statusbar.showMessage(self.status)
 
@@ -842,43 +873,55 @@ class Window(QMainWindow):
 
         max_time = int(self.input_time.text())
 
-        self.data = numpy.zeros((0, 2))
+        self.data = []
 
         t0 = datetime.datetime.now()
+        t_plot = datetime.datetime.now()
 
-        out_file_name = '{0}_{1.year}{1.month:02}{1.day:02}_{1.hour:02}'\
-                '{1.minute:02}{1.second:02}.txt'.format(
-                        self.input_file.text(), t0)
-        out_file = open(os.path.join(self.path_name, out_file_name), 'w')
-        out_file.write('Test')
-        out_file.close()
-
-
-        x0A = numpy.random.randint(30, 70)
-        sA = numpy.random.randint(5, 10)
-
-        x0B = numpy.random.randint(30, 70)
-        sB = numpy.random.randint(5, 10)
+        #out_file_name = '{0}_{1.year}{1.month:02}{1.day:02}_{1.hour:02}'\
+        #        '{1.minute:02}{1.second:02}.txt'.format(
+        #                self.input_file.text(), t0)
+        #out_file = open(os.path.join(self.path_name, out_file_name), 'w')
 
         while True:
             if self.finish:
                 break
 
-            shape = self.data.shape
-            self.data.resize((shape[0] + 100, 2), refcheck=False)
-            self.data[-100:, 0] = numpy.random.normal(x0A, sA, size=100)
-            self.data[-100:, 1] = numpy.random.normal(x0B, sB, size=100)
+            try:
+                t, [A, B] = self.s.measure_relative_adc(self.config['pre'], 
+                                                self.config['post'],
+                                        num_captures=self.config['captures'],
+                                        timebase=self.config['timebase'], 
+                                        inverse=True)
+                for i, Ai in enumerate(A):
+                    xa = tools.amplitude(A[i, :], self.config['A']['filter'],
+                            self.clock)
+                    xb = tools.amplitude(B[i, :], self.config['B']['filter'],
+                            self.clock)
 
-            self.update_data()
+                    ta = tools.zero_crossing(A[i, :], 
+                            self.config['A']['filter']['B'], 
+                            falling=False)
+                    tb = tools.zero_crossing(B[i, :], 
+                            self.config['B']['filter']['B'], 
+                            falling=False)
 
-            self.figure.canvas.draw()
-            self.figure.canvas.flush_events()
+                    self.data.append([xa, xb, ta, tb])
 
-            dt = (datetime.datetime.now() - t0).total_seconds()
-            if dt > max_time:
-                self.finish = True
-            self.progress.setValue(int(dt / max_time * 100))
-
+                tnow = datetime.datetime.now()
+                dt = (tnow - t0).total_seconds()
+                self.progress.setValue(int(dt / max_time * 100))
+                dt_plot = (tnow - t_plot).total_seconds()
+                if dt_plot > t_update:
+                    self.update_data()
+                    self.figure.canvas.draw()
+                    self.figure.canvas.flush_events()
+                    t_plot = datetime.datetime.now()
+                if dt > max_time:
+                    self.finish = True
+            except KeyboardInterrupt:
+                print('\r Stop                ')
+                break
 
         self.input_time.setReadOnly(False)
         self.status = 'Ready'
@@ -912,7 +955,7 @@ class Window(QMainWindow):
         if yr >= self.ch_range[1]:
             yr = self.ch_range[1] - 1
 
-        df = pandas.DataFrame(self.data, columns=['A', 'B'])
+        df = pandas.DataFrame(self.data, columns=['A', 'B', 'tA', 'tB'])
         good = df[df.A >= xl][df.A <= xr][df.B >= yl][df.B <= yr]
 
         if self.combo_fit.currentText() == 'A':
@@ -928,7 +971,7 @@ class Window(QMainWindow):
             col = 1
             row = 0
         elif self.combo_fit.currentText() == 'dt':
-            bins, edges = numpy.histogram(good.B - good.A, 
+            bins, edges = numpy.histogram(good.tB - good.tA, 
                     range=(-100, 100), bins=200)
             xl = 0
             xr = 199
