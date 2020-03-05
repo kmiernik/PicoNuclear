@@ -6,6 +6,8 @@ setup(
     author='Krzysztof Miernik',
     author_email='kamiernik@gmail.com',
     packages=['PicoNuclear'],
+    package_dir={'PicoNuclear': ''},
+    package_data={'PicoNuclear': ['config/*.xml']},
     url=['https://github.com/kmiernik/PicoNuclear'],
     scripts=['bin/mini_pet.py',
              'bin/pico_capture.py'],

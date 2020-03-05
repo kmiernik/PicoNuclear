@@ -11,7 +11,8 @@
 
     <!-- Parameters for experts -->
     <hardware>
-        <samples timebase="4" pre="100" post="412" captures="16"/>
+        <samples timebase="4" pre="100" post="412" captures="16"
+            ch_range="1024" t_range="1024"/>
 
         <channel name="A" coupling="AC" offset="0.9" range="1">
             <filter L="20" G="20" tau="9000" B="20" method='trapezoidal'/>
