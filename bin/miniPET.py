@@ -396,6 +396,7 @@ class ConfigWindow(QDialog):
     def default_clicked(self):
         default_config = os.path.join(PicoNuclear.__path__[0], 'config', 
                 'default.xml')
+        self.config = {}
         self.config = tools.load_configuration(default_config)
         self.close()
 
@@ -600,6 +601,13 @@ class Window(QMainWindow):
         self.label_time.setFixedWidth(70)
         self.label_time.setAlignment(Qt.AlignRight)
 
+        self.input_elapsed = QLineEdit()
+        self.input_elapsed.setText('0.00 s')
+        self.input_elapsed.setFixedWidth(70)
+        self.input_elapsed.setReadOnly(True)
+        self.input_elapsed.setStyleSheet("color: black; background-color: gray")
+
+
         self.input_time = QLineEdit()
         self.input_time.setText('10')
         self.input_time.setFixedWidth(70)
@@ -672,7 +680,7 @@ class Window(QMainWindow):
         self.button_fit.clicked.connect(self.fit)
 
         self.combo_fit = QComboBox()
-        self.combo_fit.addItems(['A', 'B', 'dt'])
+        self.combo_fit.addItems(['A', 'A good', 'B', 'B good', 'dt'])
 
         self.label_fit = QLabel()
         self.label_fit.setText('Channel')
@@ -703,7 +711,8 @@ class Window(QMainWindow):
         layout.addWidget(self.input_file, 0, 3)
         layout.addWidget(self.label_time, 0, 4)
         layout.addWidget(self.input_time, 0, 5)
-        layout.addWidget(self.progress, 0, 6, 1, 2)
+        layout.addWidget(self.input_elapsed, 0, 6)
+        layout.addWidget(self.progress, 0, 7)
 
         layout.addWidget(hline1, 1, 0, 1, 8)
 
@@ -745,6 +754,19 @@ class Window(QMainWindow):
         config_dialog = ConfigWindow(self.config)
         config_dialog.exec_()
 
+        self.config = config_dialog.config
+
+        self.s.set_channel('A', coupling_type=self.config['A']['coupling'], 
+                range_value=self.config['A']['range'], 
+                offset=self.config['A']['offset'])
+        self.s.set_channel('B', coupling_type=self.config['B']['coupling'],
+                range_value=self.config['B']['range'], 
+                offset=self.config['B']['offset'])
+        self.s.set_trigger(self.config['trigger']['source'],
+                    threshold=self.config['trigger']['threshold'],
+                    direction=self.config['trigger']['direction'], 
+                    auto_trigger=self.config['trigger']['autotrigger'])
+
 
     def calibrate(self):
         calibration = CalibrationWindow(self.calib)
@@ -784,7 +806,7 @@ class Window(QMainWindow):
                                  self.ch_range[1] * self.calib['B'][1] +
                                                     self.calib['B'][0])
 
-        self.axes[0][0].set_xlim(-100, 100)
+        self.axes[0][0].set_xlim(self.t_range)
         self.axes[0][0].set_xlabel('$\Delta$t (ns)', size=14)
 
         self.axes[1][1].set_xlabel('A (ch)', size=14)
@@ -794,25 +816,43 @@ class Window(QMainWindow):
 
 
     def update_data(self):
-        a0 = int(self.input_a0.text())
-        a1 = int(self.input_a1.text())
-        b0 = int(self.input_b0.text())
-        b1 = int(self.input_b1.text())
+        try:
+            a0 = int(self.input_a0.text())
+            a1 = int(self.input_a1.text())
+            b0 = int(self.input_b0.text())
+            b1 = int(self.input_b1.text())
+        except ValueError:
+            return None
+
+        xl = int(self.get_channel('A', int(self.input_a0.text())))
+        xr = int(self.get_channel('A', int(self.input_a1.text())))
+        if xl < self.ch_range[0]:
+            xl = self.ch_range[0]
+        if xr >= self.ch_range[1]:
+            xr = self.ch_range[1] - 1
+
+        yl = int(self.get_channel('B', int(self.input_b0.text())))
+        yr = int(self.get_channel('B', int(self.input_b1.text())))
+        if yl < self.ch_range[0]:
+            yl = self.ch_range[0]
+        if yr >= self.ch_range[1]:
+            yr = self.ch_range[1] - 1
+
 
         df = pandas.DataFrame(self.data, columns=['A', 'B', 'tA', 'tB'])
-        good = df[df.A >= a0][df.A <= a1][df.B >= b0][df.B <= b1]
+        good = df[df.A >= xl][df.A <= xr][df.B >= yl][df.B <= yr]
         self.count_input.setText('{}'.format(good.shape[0]))
 
         bins, edges = numpy.histogram(df.tB - df.tA, 
                 range=self.t_range, bins=self.t_bins)
         self.data00.set_ydata(bins)
-        self.data00.set_xdata(edges[:-1])
+        self.data00.set_xdata(edges[:-1] * self.config['timebase'])
         self.axes[0][0].set_ylim(0, max(bins[5:]) * 1.1)
 
         bins, edges = numpy.histogram(good.tB - good.tA, 
                 range=self.t_range, bins=self.t_bins)
         self.data00g.set_ydata(bins)
-        self.data00g.set_xdata(edges[:-1])
+        self.data00g.set_xdata(edges[:-1] * self.config['timebase'])
 
         bins, edges = numpy.histogram(df.A, range=self.ch_range, 
                 bins=self.ch_bins)
@@ -849,7 +889,10 @@ class Window(QMainWindow):
 
 
     def start(self):
-        t_update = 1.0
+        if self.status == 'Measuring':
+            return None
+
+        t_update = 0.1
         self.status = 'Measuring'
         self.statusbar.showMessage(self.status)
 
@@ -878,10 +921,8 @@ class Window(QMainWindow):
         t0 = datetime.datetime.now()
         t_plot = datetime.datetime.now()
 
-        #out_file_name = '{0}_{1.year}{1.month:02}{1.day:02}_{1.hour:02}'\
-        #        '{1.minute:02}{1.second:02}.txt'.format(
-        #                self.input_file.text(), t0)
-        #out_file = open(os.path.join(self.path_name, out_file_name), 'w')
+        header = 'Start at {}\n'.format(t0)
+        header += 'EA  EB  tA  tB\n'
 
         while True:
             if self.finish:
@@ -894,9 +935,9 @@ class Window(QMainWindow):
                                         timebase=self.config['timebase'], 
                                         inverse=True)
                 for i, Ai in enumerate(A):
-                    xa = tools.amplitude(A[i, :], self.config['A']['filter'],
+                    xa = tools.amplitude(A[i, :], self.config['A'],
                             self.clock)
-                    xb = tools.amplitude(B[i, :], self.config['B']['filter'],
+                    xb = tools.amplitude(B[i, :], self.config['B'],
                             self.clock)
 
                     ta = tools.zero_crossing(A[i, :], 
@@ -911,6 +952,7 @@ class Window(QMainWindow):
                 tnow = datetime.datetime.now()
                 dt = (tnow - t0).total_seconds()
                 self.progress.setValue(int(dt / max_time * 100))
+                self.input_elapsed.setText('{:.2f} s'.format(dt))
                 dt_plot = (tnow - t_plot).total_seconds()
                 if dt_plot > t_update:
                     self.update_data()
@@ -923,6 +965,22 @@ class Window(QMainWindow):
                 print('\r Stop                ')
                 break
 
+        tnow = datetime.datetime.now()
+        dt = (tnow - t0).total_seconds()
+
+        footer = 'Stop at {}\n'.format(tnow)
+        footer += 'Total running time: {:.3f} s\n'.format(dt)
+        footer += 'Total events: {}'.format(len(self.data))
+
+        out_file_name = '{0}_{1.year}{1.month:02}{1.day:02}_{1.hour:02}'\
+                '{1.minute:02}{1.second:02}.txt'.format(
+                        self.input_file.text(), t0)
+        out_file_path  = os.path.join(self.path_name, out_file_name)
+        numpy.savetxt(out_file_path, self.data, fmt='%.3f', header=header,
+                footer=footer, delimiter=' ')
+
+        self.progress.setValue(100)
+        self.input_elapsed.setText('{:.2f} s'.format(dt))
         self.input_time.setReadOnly(False)
         self.status = 'Ready'
         self.statusbar.showMessage(self.status)
@@ -948,8 +1006,8 @@ class Window(QMainWindow):
         if xr >= self.ch_range[1]:
             xr = self.ch_range[1] - 1
 
-        yl = int(self.get_channel('B', int(self.input_a0.text())))
-        yr = int(self.get_channel('B', int(self.input_a1.text())))
+        yl = int(self.get_channel('B', int(self.input_b0.text())))
+        yr = int(self.get_channel('B', int(self.input_b1.text())))
         if yl < self.ch_range[0]:
             yl = self.ch_range[0]
         if yr >= self.ch_range[1]:
@@ -959,26 +1017,47 @@ class Window(QMainWindow):
         good = df[df.A >= xl][df.A <= xr][df.B >= yl][df.B <= yr]
 
         if self.combo_fit.currentText() == 'A':
-            bins, edges = numpy.histogram(good.A, range=self.ch_range, 
+            bins, edges = numpy.histogram(df.A, range=self.ch_range, 
                     bins=self.ch_bins)
             col = 0
             row = 1
+            ch = 'A'
+        if self.combo_fit.currentText() == 'A good':
+            bins, edges = numpy.histogram(good.A, range=self.ch_range, 
+                    bins=self.ch_bins)
+            col = 0
+            row = 1 
+            ch = 'A'
         elif self.combo_fit.currentText() == 'B':
+            bins, edges = numpy.histogram(df.B, range=self.ch_range, 
+                    bins=self.ch_bins)
+            xl = yl
+            xr = yr
+            col = 1
+            row = 0
+            ch = 'B'
+        elif self.combo_fit.currentText() == 'B good':
             bins, edges = numpy.histogram(good.B, range=self.ch_range, 
                     bins=self.ch_bins)
             xl = yl
             xr = yr
             col = 1
             row = 0
+            ch = 'B'
         elif self.combo_fit.currentText() == 'dt':
             bins, edges = numpy.histogram(good.tB - good.tA, 
-                    range=(-100, 100), bins=200)
+                    range=self.t_range, bins=self.t_bins)
             xl = 0
-            xr = 199
+            xr = self.t_bins - 1
             col = 0
             row = 0
+            ch = 'dt'
 
-        x0 = numpy.argmax(bins[xl:xr]) + edges[xl]
+        try:
+            x0 = numpy.argmax(bins[xl:xr]) + edges[xl]
+        except ValueError:
+            self.input_fit.setPlainText('Fit error')
+            return None
         s = (xr - xl) / 3
         a1 = (bins[xr] - bins[xl]) / (edges[xr] - edges[xl])
         a0 = bins[xl] - edges[xl] * a1
@@ -992,22 +1071,27 @@ class Window(QMainWindow):
             self.input_fit.setPlainText('Fit error')
             return None
 
-        self.axes[col][row].plot(edges[xl:xr] * 
-                self.calib[self.combo_fit.currentText()][1] + 
-                self.calib[self.combo_fit.currentText()][0], 
-                self.peak(edges[xl:xr], *popt),
-                            '--')
+        if ch == 'dt':
+            self.axes[col][row].plot(edges[xl:xr] * self.config['timebase'], 
+                    self.peak(edges[xl:xr], *popt), '--')
+        else:
+            self.axes[col][row].plot(edges[xl:xr] * self.calib[ch][1] + 
+                    self.calib[ch][0], self.peak(edges[xl:xr], *popt),
+                                '--')
 
         perr = numpy.sqrt(numpy.diag(pcov))
 
         params = ['A', 'x0', 's', 'a0', 'a1']
         text = ''
         for i in [1, 2]:
-            text += '{} = {:.1f} +/- {:.2f}\n'.format(params[i], 
-                    popt[i] * self.calib[self.combo_fit.currentText()][1] + 
-                              self.calib[self.combo_fit.currentText()][0],
-                    perr[i] * self.calib[self.combo_fit.currentText()][1] + 
-                              self.calib[self.combo_fit.currentText()][0])
+            if ch == 'dt':
+                text += '{} = {:.1f} +/- {:.2f}\n'.format(params[i], 
+                        popt[i] * self.config['timebase'], 
+                        perr[i] * self.config['timebase'])
+            else:
+                text += '{} = {:.1f} +/- {:.2f}\n'.format(params[i], 
+                        popt[i] * self.calib[ch][1] + self.calib[ch][0],
+                        perr[i] * self.calib[ch][1] + self.calib[ch][0])
         self.input_fit.setPlainText(text)
         for i in [0, 3, 4]:
             text += '{} = {:.1f} +/- {:.2f}\n'.format(params[i], popt[i], perr[i])
