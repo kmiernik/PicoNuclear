@@ -131,10 +131,10 @@ def load_configuration(file_name):
 
 
 def trapezoidal(v, params, clock):
-    b = params['B']
-    k = params['L']
-    m = params['G']
-    tau = params['tau']
+    b = params['filter']['B']
+    k = params['filter']['L']
+    m = params['filter']['G']
+    tau = params['filter']['tau']
 
     base = v[0:b].sum() / b
     N = len(v)
@@ -207,11 +207,11 @@ def zero_crossing(trace, base=15, shift=10, chi=0.6, falling=True):
 
 
 def amplitude(s, params, clock, method='trapezoidal'):
-    if params['method'] == 'trapezoidal':
+    if params['filter']['method'] == 'trapezoidal':
         A, sa = trapezoidal(s, params, clock)
     else:
         baseline = s[0:params['B']].sum() / params['B']
-        if params['method'] == 'sum':
+        if params['filter']['method'] == 'sum':
             A = abs((s - baseline).sum()) / s.shape[0]
         else:
             A = max(abs(s - baseline))

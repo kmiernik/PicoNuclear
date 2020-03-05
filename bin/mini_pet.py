@@ -293,7 +293,7 @@ if __name__ == '__main__':
     print('Press any key to exit')
     try:
         while True:
-            key = fig.waitforbuttonpress(1)
+            key = fig.waitforbuttonpress(10)
             if key:
                 break
     except KeyboardInterrupt:
