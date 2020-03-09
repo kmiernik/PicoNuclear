@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=miniPET
+Comment=mini PET Graphical Interface
+Exec=/usr/bin/miniPET.py
+Icon=/opt/miniPET/minipet_icon.svg
+Terminal=false
+X-MultipleArgs=false
+Type=Application
+Categories=Education;Science
+Encoding=UTF-8
+StartupNotify=true
+MimeType=application/x-psdata;

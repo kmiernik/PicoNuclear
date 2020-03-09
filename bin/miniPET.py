@@ -1,8 +1,11 @@
+#!/usr/bin/env python3
+
 import datetime
 import numpy
 import os
 import pandas
 import sys
+import time
 
 import matplotlib.pyplot as plt
 import PicoNuclear
@@ -511,27 +514,45 @@ class Window(QMainWindow):
                            }
         self.ch_range = [0, self.config['ch_range']]
         self.ch_bins = self.config['ch_range']
-        self.t_range = [-self.config['t_range'], self.config['t_range']]
-        self.t_bins = 2 * self.config['t_range']
+        self.t_range = [int(-self.config['t_range']/2), 
+                        int(self.config['t_range']/2)]
+        self.t_bins = self.config['t_range']
 
         self.path_name = os.path.expanduser('~')
 
-        self.s = PicoScope3000A()
+        try:
+            self.s = PicoScope3000A()
 
-        self.s.set_channel('A', coupling_type=self.config['A']['coupling'], 
-                range_value=self.config['A']['range'], 
-                offset=self.config['A']['offset'])
-        self.s.set_channel('B', coupling_type=self.config['B']['coupling'],
-                range_value=self.config['B']['range'], 
-                offset=self.config['B']['offset'])
-        self.s.set_trigger(self.config['trigger']['source'],
-                    threshold=self.config['trigger']['threshold'],
-                    direction=self.config['trigger']['direction'], 
-                    auto_trigger=self.config['trigger']['autotrigger'])
+            self.s.set_channel('A', coupling_type=self.config['A']['coupling'], 
+                    range_value=self.config['A']['range'], 
+                    offset=self.config['A']['offset'])
+            self.s.set_channel('B', coupling_type=self.config['B']['coupling'],
+                    range_value=self.config['B']['range'], 
+                    offset=self.config['B']['offset'])
+            self.s.set_trigger(self.config['trigger']['source'],
+                        threshold=self.config['trigger']['threshold'],
+                        direction=self.config['trigger']['direction'], 
+                        auto_trigger=self.config['trigger']['autotrigger'])
+            self.clock = self.s.get_interval_from_timebase(
+                    self.config['timebase'], 
+                    self.config['pre'] + self.config['post'])
+        except PicoNuclear.pico3000a.DeviceNotFoundError:
+            demo_msg = QMessageBox()
+            demo_msg.setIcon(QMessageBox.Warning)
+            demo_msg.setWindowTitle('Warning')
+            demo_msg.setText('PicoScope not found!')
+            demo_msg.setInformativeText(
+                    'Demo mode will be used. Do you want to continue?')
+            demo_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            ret_val = demo_msg.exec_()
+            if ret_val == QMessageBox.No:
+                sys.exit()
+	
+            self.s = None
+            demo_data_path = os.path.join(PicoNuclear.__path__[0], 'demo', 
+                                        'demo_data.txt')
+            self.demo_data = numpy.loadtxt(demo_data_path)
 
-        self.clock = self.s.get_interval_from_timebase(
-                self.config['timebase'], 
-                self.config['pre'] + self.config['post'])
 
         self.initUI()
 
@@ -609,7 +630,7 @@ class Window(QMainWindow):
 
 
         self.input_time = QLineEdit()
-        self.input_time.setText('10')
+        self.input_time.setText('30')
         self.input_time.setFixedWidth(70)
         self.input_time.setValidator(self.onlyInt)
 
@@ -680,7 +701,7 @@ class Window(QMainWindow):
         self.button_fit.clicked.connect(self.fit)
 
         self.combo_fit = QComboBox()
-        self.combo_fit.addItems(['A', 'A good', 'B', 'B good', 'dt'])
+        self.combo_fit.addItems(['A', 'A gate', 'B', 'B gate', 'dt'])
 
         self.label_fit = QLabel()
         self.label_fit.setText('Channel')
@@ -756,16 +777,17 @@ class Window(QMainWindow):
 
         self.config = config_dialog.config
 
-        self.s.set_channel('A', coupling_type=self.config['A']['coupling'], 
-                range_value=self.config['A']['range'], 
-                offset=self.config['A']['offset'])
-        self.s.set_channel('B', coupling_type=self.config['B']['coupling'],
-                range_value=self.config['B']['range'], 
-                offset=self.config['B']['offset'])
-        self.s.set_trigger(self.config['trigger']['source'],
-                    threshold=self.config['trigger']['threshold'],
-                    direction=self.config['trigger']['direction'], 
-                    auto_trigger=self.config['trigger']['autotrigger'])
+        if self.s is not None:
+            self.s.set_channel('A', coupling_type=self.config['A']['coupling'], 
+                    range_value=self.config['A']['range'], 
+                    offset=self.config['A']['offset'])
+            self.s.set_channel('B', coupling_type=self.config['B']['coupling'],
+                    range_value=self.config['B']['range'], 
+                    offset=self.config['B']['offset'])
+            self.s.set_trigger(self.config['trigger']['source'],
+                        threshold=self.config['trigger']['threshold'],
+                        direction=self.config['trigger']['direction'], 
+                        auto_trigger=self.config['trigger']['autotrigger'])
 
 
     def calibrate(self):
@@ -787,6 +809,7 @@ class Window(QMainWindow):
                 self.axes[0][0].set_ylim(0, 1)
 
         self.axes[0][1].set_xlabel('A (ch)', size=14)
+        self.axes[0][1].set_ylabel('Counts', size=14)
         self.axes[0][1].set_xlim(self.ch_range[0] * self.calib['A'][1] +
                                                     self.calib['A'][0],
                                  self.ch_range[1] * self.calib['A'][1] +
@@ -797,6 +820,7 @@ class Window(QMainWindow):
                                                     self.calib['A'][0])
 
         self.axes[1][0].set_xlabel('B (ch)', size=14)
+        self.axes[1][0].set_ylabel('Counts', size=14)
         self.axes[1][0].set_xlim(self.ch_range[0] * self.calib['B'][1] +
                                                     self.calib['B'][0],
                                  self.ch_range[1] * self.calib['B'][1] +
@@ -807,7 +831,8 @@ class Window(QMainWindow):
                                                     self.calib['B'][0])
 
         self.axes[0][0].set_xlim(self.t_range)
-        self.axes[0][0].set_xlabel('$\Delta$t (ns)', size=14)
+        self.axes[0][0].set_ylabel('Counts', size=14)
+        self.axes[0][0].set_xlabel('$\Delta t_{BA}$ (ns)', size=14)
 
         self.axes[1][1].set_xlabel('A (ch)', size=14)
         self.axes[1][1].set_ylabel('B (ch)', size=14)
@@ -856,6 +881,12 @@ class Window(QMainWindow):
 
         bins, edges = numpy.histogram(df.A, range=self.ch_range, 
                 bins=self.ch_bins)
+        self.data01L.set_ydata([0, max(bins) * 2])
+        self.data01L.set_xdata(xl * self.calib['A'][1] 
+                              + self.calib['A'][0])
+        self.data01R.set_ydata([0, max(bins) * 2])
+        self.data01R.set_xdata(xr * self.calib['A'][1] 
+                              + self.calib['A'][0])
         self.data01.set_ydata(bins)
         self.data01.set_xdata(edges[:-1] * self.calib['A'][1] 
                               + self.calib['A'][0])
@@ -869,6 +900,12 @@ class Window(QMainWindow):
 
         bins, edges = numpy.histogram(df.B, range=self.ch_range, 
                 bins=self.ch_bins)
+        self.data10L.set_ydata([0, max(bins) * 2])
+        self.data10L.set_xdata(yl * self.calib['B'][1] 
+                              + self.calib['B'][0])
+        self.data10R.set_ydata([0, max(bins) * 2])
+        self.data10R.set_xdata(yr * self.calib['B'][1] 
+                              + self.calib['B'][0])
         self.data10.set_ydata(bins)
         self.data10.set_xdata(edges[:-1] * self.calib['B'][1] 
                               + self.calib['B'][0])
@@ -901,8 +938,15 @@ class Window(QMainWindow):
         self.init_axes()
 
         self.data00, = self.axes[0][0].plot([0], [0], ds='steps-mid', color='black')
+        
+        self.data10L, = self.axes[1][0].plot([0], [0], ls='--', color='red')
+        self.data10R, = self.axes[1][0].plot([0], [0], ls='--', color='red')
         self.data10, = self.axes[1][0].plot([0], [0], ds='steps-mid', color='black')
+
+        self.data01L, = self.axes[0][1].plot([0], [0], ls='--', color='red')
+        self.data01R, = self.axes[0][1].plot([0], [0], ls='--', color='red')
         self.data01, = self.axes[0][1].plot([0], [0], ds='steps-mid', color='black')
+
         self.data11, = self.axes[1][1].plot([0], [0], marker='o', mfc='None', 
                 ls='None', color='black')
 
@@ -929,25 +973,30 @@ class Window(QMainWindow):
                 break
 
             try:
-                t, [A, B] = self.s.measure_relative_adc(self.config['pre'], 
-                                                self.config['post'],
+                if self.s is not None:
+                    t, [A, B] = self.s.measure_relative_adc(
+                                        self.config['pre'], self.config['post'],
                                         num_captures=self.config['captures'],
                                         timebase=self.config['timebase'], 
                                         inverse=True)
-                for i, Ai in enumerate(A):
-                    xa = tools.amplitude(A[i, :], self.config['A'],
-                            self.clock)
-                    xb = tools.amplitude(B[i, :], self.config['B'],
-                            self.clock)
+                    for i, Ai in enumerate(A):
+                        xa = tools.amplitude(A[i, :], self.config['A'],
+                                self.clock)
+                        xb = tools.amplitude(B[i, :], self.config['B'],
+                                self.clock)
 
-                    ta = tools.zero_crossing(A[i, :], 
-                            self.config['A']['filter']['B'], 
-                            falling=False)
-                    tb = tools.zero_crossing(B[i, :], 
-                            self.config['B']['filter']['B'], 
-                            falling=False)
+                        ta = tools.zero_crossing(A[i, :], 
+                                self.config['A']['filter']['B'], 
+                                falling=False)
+                        tb = tools.zero_crossing(B[i, :], 
+                                self.config['B']['filter']['B'], 
+                                falling=False)
 
-                    self.data.append([xa, xb, ta, tb])
+                        self.data.append([xa, xb, ta, tb])
+                else:
+                    n = self.demo_data.shape[0]
+                    self.data.append(self.demo_data[numpy.random.choice(n)])
+                    time.sleep(0.01)
 
                 tnow = datetime.datetime.now()
                 dt = (tnow - t0).total_seconds()

@@ -7,9 +7,12 @@ setup(
     author_email='kamiernik@gmail.com',
     packages=['PicoNuclear'],
     package_dir={'PicoNuclear': ''},
-    package_data={'PicoNuclear': ['config/*.xml']},
+    package_data={'PicoNuclear': ['config/*.xml'],
+                  'PicoNuclear': ['demo/*.txt'],
+                },
     url=['https://github.com/kmiernik/PicoNuclear'],
     scripts=['bin/mini_pet.py',
+             'bin/miniPET.py',
              'bin/pico_capture.py'],
     license='LICENSE.txt',
     description='Front-end for picoscope to be used for nuclear physics\
