@@ -1071,7 +1071,7 @@ class Window(QMainWindow):
             col = 0
             row = 1
             ch = 'A'
-        if self.combo_fit.currentText() == 'A good':
+        if self.combo_fit.currentText() == 'A gate':
             bins, edges = numpy.histogram(good.A, range=self.ch_range, 
                     bins=self.ch_bins)
             col = 0
@@ -1085,7 +1085,7 @@ class Window(QMainWindow):
             col = 1
             row = 0
             ch = 'B'
-        elif self.combo_fit.currentText() == 'B good':
+        elif self.combo_fit.currentText() == 'B gate':
             bins, edges = numpy.histogram(good.B, range=self.ch_range, 
                     bins=self.ch_bins)
             xl = yl
