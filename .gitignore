@@ -2,6 +2,7 @@
 *~
 *.swp
 # Directories
+docs
 __pycache__
 PicoNuclear.egg-info
 build
