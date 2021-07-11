@@ -397,7 +397,7 @@ class ConfigWindow(QDialog):
 
 
     def default_clicked(self):
-        default_config = os.path.join(PicoNuclear.__path__[0], 'config', 
+        default_config = os.path.join(PicoNuclear.__path__[0], 'data', 
                 'default.xml')
         self.config = {}
         self.config = tools.load_configuration(default_config)
@@ -504,7 +504,7 @@ class Window(QMainWindow):
         self.finish = False
         self.status = 'Ready'
         self.data = None
-        default_config = os.path.join(PicoNuclear.__path__[0], 'config', 
+        default_config = os.path.join(PicoNuclear.__path__[0], 'data', 
                 'default.xml')
         self.config = tools.load_configuration(default_config)
 
@@ -549,7 +549,7 @@ class Window(QMainWindow):
                 sys.exit()
 	
             self.s = None
-            demo_data_path = os.path.join(PicoNuclear.__path__[0], 'demo', 
+            demo_data_path = os.path.join(PicoNuclear.__path__[0], 'data', 
                                         'demo_data.txt')
             self.demo_data = numpy.loadtxt(demo_data_path)
 
@@ -865,7 +865,7 @@ class Window(QMainWindow):
 
 
         df = pandas.DataFrame(self.data, columns=['A', 'B', 'tA', 'tB'])
-        good = df[df.A >= xl][df.A <= xr][df.B >= yl][df.B <= yr]
+        good = df[((df.A >= xl) & (df.A <= xr) & (df.B >= yl) & (df.B <= yr))]
         self.count_input.setText('{}'.format(good.shape[0]))
 
         bins, edges = numpy.histogram(df.tB - df.tA, 
