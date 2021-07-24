@@ -103,6 +103,7 @@ class PicoScope3000A:
         self._input_voltage_ranges = {}
         self._input_offsets = {}
         self._input_adc_ranges = {}
+        self._offset_ranges = {}
         self._buffers = {}
         self.data_is_ready = Event()
         self._callback = callback_factory(self.data_is_ready)
@@ -156,10 +157,10 @@ class PicoScope3000A:
         """
         channel = _get_channel_from_name(channel_name)
         coupling_type = _get_coupling_type_from_name(coupling_type)
-        range = _get_range_from_value(range_value)
+        vrange = _get_range_from_value(range_value)
         assert_pico_ok(ps.ps3000aSetChannel(self._handle, channel, is_enabled,
-                                            coupling_type, range, offset))
-
+                                            coupling_type, vrange, offset))
+        
         self._input_voltage_ranges[channel_name] = float(range_value)
         self._input_offsets[channel_name] = float(offset)
         max_adc_value = ctypes.c_int16()
@@ -167,6 +168,14 @@ class PicoScope3000A:
                                               ctypes.byref(max_adc_value)))
         self._input_adc_ranges[channel_name] = max_adc_value.value
         self._channels_enabled[channel_name] = is_enabled
+
+        min_offset = ctypes.c_float()
+        max_offset = ctypes.c_float()
+        assert_pico_ok(ps.ps3000aGetAnalogueOffset( self._handle, vrange, 
+                            coupling_type,
+                            ctypes.byref(max_offset), ctypes.byref(min_offset)))
+        self._offset_ranges[channel_name] = [min_offset.value, max_offset.value]
+
 
     def measure(self, num_pre_samples, num_post_samples, timebase=1,
                 num_captures=1):

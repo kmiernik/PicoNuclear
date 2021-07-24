@@ -100,24 +100,25 @@ def load_configuration(file_name):
                                                 }
                                 }
 
-        analysis = config.getElementsByTagName('analysis')[0]
-        channels = analysis.getElementsByTagName('channel')
-        for ch in channels:
-            name = ch.getAttribute('name').upper()
-            calib = ch.getAttribute('calibration')
-            calib = calib.split(',')
-            calib_params = []
-            for par in calib:
-                calib_params.append(float(par))
+        analysis = config.getElementsByTagName('analysis')
+        if len(analysis) > 0:
+            channels = analysis[0].getElementsByTagName('channel')
+            for ch in channels:
+                name = ch.getAttribute('name').upper()
+                calib = ch.getAttribute('calibration')
+                calib = calib.split(',')
+                calib_params = []
+                for par in calib:
+                    calib_params.append(float(par))
 
-            window = ch.getAttribute('window')
-            window = window.split(',')
-            window_params = []
-            for par in window:
-                window_params.append(float(par))
+                window = ch.getAttribute('window')
+                window = window.split(',')
+                window_params = []
+                for par in window:
+                    window_params.append(float(par))
 
-            configuration[name]['calib'] = calib_params
-            configuration[name]['window'] = window_params
+                configuration[name]['calib'] = calib_params
+                configuration[name]['window'] = window_params
 
     except (ValueError, IndexError) as err:
         print(err)
@@ -126,6 +127,19 @@ def load_configuration(file_name):
 
 
 def trapezoidal(v, params, clock):
+    """
+    Applies trapezoidal filter to a waveform v
+    V.T. Jordanov NIMA 353 (1994) 261
+
+    * params are a dictionary
+        o params['filter']['B'] - baseline (number of samples in front 
+                                            taken to calculate average baseline)
+        o params['filter']['L'] - length (in samples) see article for details
+        o params['filter']['G'] - gap (in samples) see article for details
+        o params['filter']['tau'] - signal decay constant
+
+    * returns A, s - amplitude and filtered signal
+    """
     b = params['filter']['B']
     k = params['filter']['L']
     m = params['filter']['G']
@@ -174,7 +188,15 @@ def trapezoidal(v, params, clock):
 
 def zero_crossing(trace, base=15, shift=10, chi=0.6, falling=True):
     """
+    Calculates trigger time based on zero crossing algorithm
     NIMA 775 (2015) 71–76
+
+    * trace - a waveform to be analyzed
+    * base - number of samples in front to calculate average baseline
+    * shift - algorithm parameter (see article for more details)
+    * chi - algorithm parameter (see article for more details)
+    * falling - signal defaults to falling edge
+    * returns trigger time in time stamps
     """
 
     try:
