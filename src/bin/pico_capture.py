@@ -76,7 +76,7 @@ if __name__ == '__main__':
                                     falling=False)
             axes[ix][iy].axvline(ta / unit[0], ls='--', color='red')
             axes[ix][iy].text(ta / unit[0], 0, 
-                    ' A = {:.1f}\n t = {:.1f}'.format(amp, ta / unit[0]),
+                    ' A = {:.1f}\n t = {:.1f}'.format(amp[0], ta / unit[0]),
                     fontsize=8)
 
 

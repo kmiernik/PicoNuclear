@@ -10,6 +10,7 @@ import datetime
 import numpy
 import xml.dom.minidom
 from scipy.interpolate import CubicSpline
+from scipy.signal import find_peaks
 
 
 def progress_bar(n, n_max, time_to_n=None):
@@ -85,6 +86,7 @@ def load_configuration(file_name):
             L = get_number(trapez.getAttribute('L'), 10, 'int')
             G = get_number(trapez.getAttribute('G'), 10, 'int')
             B = get_number(trapez.getAttribute('B'), 10, 'int')
+            threshold = get_number(trapez.getAttribute('threshold'), 0.0)
             tau = get_number(trapez.getAttribute('tau'), 10)
             method = trapez.getAttribute('method')
 
@@ -96,7 +98,8 @@ def load_configuration(file_name):
                                                 'G' : G, 
                                                 'tau' : tau,
                                                 'B' : B, 
-                                                'method' : method
+                                                'method' : method,
+                                                'threshold': threshold
                                                 }
                                 }
 
@@ -126,7 +129,7 @@ def load_configuration(file_name):
     return configuration
 
 
-def trapezoidal(v, params, clock):
+def trapezoidal(v, params, clock, pileup='max'):
     """
     Applies trapezoidal filter to a waveform v
     V.T. Jordanov NIMA 353 (1994) 261
@@ -137,13 +140,24 @@ def trapezoidal(v, params, clock):
         o params['filter']['L'] - length (in samples) see article for details
         o params['filter']['G'] - gap (in samples) see article for details
         o params['filter']['tau'] - signal decay constant
+        o params['filter']['threshold'] - threshold for local maxima level 
+                                in the filtered signal (see below)
 
-    * returns A, s - amplitude and filtered signal
+    * pileup - mode of pileups treatment
+        o 'max' - (default) take the maximum value from the filtered signal,
+                  this is the fastest, method but if there are pileups in
+                  the signal, all are rejected except of highest amplitude
+        o 'all' - find all local maxima in the filtered signal above threshold
+                  threshold is calculated from threshold:
+                  Vtr * tau
+
+    * returns A, s - amplitudes vector and filtered signal
     """
     b = params['filter']['B']
     k = params['filter']['L']
     m = params['filter']['G']
     tau = params['filter']['tau']
+    threshold = params['filter']['threshold']
 
     base = v[0:b].sum() / b
     N = len(v)
@@ -183,7 +197,13 @@ def trapezoidal(v, params, clock):
         r[n] = p[n] + M * d[n]
         s[n] = s[n-1] + r[n]
 
-    return max(abs(s)) / k, s
+    if pileup == 'all':
+        peaks, _ = find_peaks(abs(s / k), prominence=threshold * tau,
+                              distance=params['filter']['L'])
+        return abs(s[peaks]) / k, s / k
+    else:
+        return [max(abs(s)) / k], s / k
+
 
 
 def zero_crossing(trace, base=15, shift=10, chi=0.6, falling=True):
@@ -223,9 +243,9 @@ def zero_crossing(trace, base=15, shift=10, chi=0.6, falling=True):
 
 
 
-def amplitude(s, params, clock, method='trapezoidal'):
+def amplitude(s, params, clock, pileup='all'):
     if params['filter']['method'] == 'trapezoidal':
-        A, sa = trapezoidal(s, params, clock)
+        A, sa = trapezoidal(s, params, clock, pileup)
     else:
         baseline = s[0:params['B']].sum() / params['B']
         if params['filter']['method'] == 'sum':

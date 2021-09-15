@@ -15,11 +15,13 @@
             ch_range="1024" t_range="1024"/>
 
         <channel name="A" coupling="AC" offset="0.9" range="1">
-            <filter L="20" G="20" tau="9000" B="20" method='trapezoidal'/>
+            <filter L="20" G="20" tau="9000" B="20" method='trapezoidal'
+                    threshold="0.01"/>
         </channel>
 
         <channel name="B" coupling="AC" offset="1.9" range="2">
-            <filter L="20" G="20" tau="9000" B="20" method='trapezoidal'/>
+            <filter L="20" G="20" tau="9000" B="20" method='trapezoidal'
+                    threshold="0.01"/>
         </channel>
 
         <trigger source="A" direction="FALLING" threshold="-0.05"
