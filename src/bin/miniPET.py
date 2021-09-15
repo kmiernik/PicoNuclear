@@ -48,7 +48,7 @@ class ConfigWindow(QDialog):
         self.button_cancel.clicked.connect(self.cancel_clicked)
 
         self.label_trigger = QLabel()
-        self.label_trigger.setText('Trigger')
+        self.label_trigger.setText('Threshold')
         self.label_trigger.setFixedWidth(100)
 
         self.label_source = QLabel()
@@ -254,6 +254,21 @@ class ConfigWindow(QDialog):
         self.input_BB.setFixedWidth(100)
         self.input_BB.setValidator(self.onlyInt)
 
+        self.label_thr = QLabel()
+        self.label_thr.setText('Trigger')
+        self.label_thr.setFixedWidth(100)
+
+        self.input_thrA = QLineEdit()
+        self.input_thrA.setText('{}'.format(
+            self.config['A']['filter']['threshold']))
+        self.input_thrA.setFixedWidth(100)
+        self.input_thrA.setValidator(self.onlyFloat)
+
+        self.input_thrB = QLineEdit()
+        self.input_thrB.setText('{}'.format(
+            self.config['B']['filter']['threshold']))
+        self.input_thrB.setFixedWidth(100)
+        self.input_thrB.setValidator(self.onlyFloat)
 
         self.label_tau = QLabel()
         self.label_tau.setText('tau')
@@ -333,15 +348,18 @@ class ConfigWindow(QDialog):
         layout.addWidget(self.label_B, 20, 0)
         layout.addWidget(self.input_BA, 20, 1)
         layout.addWidget(self.input_BB, 20, 2)
-        layout.addWidget(self.label_tau, 21, 0)
-        layout.addWidget(self.input_tauA, 21, 1)
-        layout.addWidget(self.input_tauB, 21, 2)
+        layout.addWidget(self.label_thr, 21, 0)
+        layout.addWidget(self.input_thrA, 21, 1)
+        layout.addWidget(self.input_thrB, 21, 2)
+        layout.addWidget(self.label_tau, 22, 0)
+        layout.addWidget(self.input_tauA, 22, 1)
+        layout.addWidget(self.input_tauB, 22, 2)
 
-        layout.addWidget(hline2, 22, 0, 1, 3)
+        layout.addWidget(hline2, 23, 0, 1, 3)
 
-        layout.addWidget(self.button_done, 23, 0)
-        layout.addWidget(self.button_default, 23, 1)
-        layout.addWidget(self.button_cancel, 23, 2)
+        layout.addWidget(self.button_done, 24, 0)
+        layout.addWidget(self.button_default, 24, 1)
+        layout.addWidget(self.button_cancel, 24, 2)
 
         self.setLayout(layout)
 
@@ -373,6 +391,7 @@ class ConfigWindow(QDialog):
                                         'G' : int(self.input_GA.text()), 
                                         'B' : int(self.input_BA.text()),
                                         'tau' : float(self.input_tauA.text()),
+                                    'threshold' : float(self.input_thrA.text()),
                                         'method' : 'trapezoidal'
                                         }
                             }
@@ -385,6 +404,7 @@ class ConfigWindow(QDialog):
                                         'G' : int(self.input_GB.text()), 
                                         'B' : int(self.input_BB.text()),
                                         'tau' : float(self.input_tauB.text()),
+                                    'threshold' : float(self.input_thrB.text()),
                                         'method' : 'trapezoidal'
                                         }
                             }
@@ -872,7 +892,10 @@ class Window(QMainWindow):
                 range=self.t_range, bins=self.t_bins)
         self.data00.set_ydata(bins)
         self.data00.set_xdata(edges[:-1] * self.config['timebase'])
-        self.axes[0][0].set_ylim(0, max(bins[5:]) * 1.1)
+        ymax = max(bins[5:]) * 1.1 
+        if ymax == 0.0:
+            ymax = 1.0
+        self.axes[0][0].set_ylim(0, ymax)
 
         bins, edges = numpy.histogram(good.tB - good.tA, 
                 range=self.t_range, bins=self.t_bins)
@@ -890,7 +913,10 @@ class Window(QMainWindow):
         self.data01.set_ydata(bins)
         self.data01.set_xdata(edges[:-1] * self.calib['A'][1] 
                               + self.calib['A'][0])
-        self.axes[0][1].set_ylim(0, max(bins[5:]) * 1.1)
+        ymax = max(bins[5:]) * 1.1 
+        if ymax == 0.0:
+            ymax = 1.0
+        self.axes[0][1].set_ylim(0, ymax)
 
         bins, edges = numpy.histogram(good.A, range=self.ch_range, 
                 bins=self.ch_bins)
@@ -909,7 +935,10 @@ class Window(QMainWindow):
         self.data10.set_ydata(bins)
         self.data10.set_xdata(edges[:-1] * self.calib['B'][1] 
                               + self.calib['B'][0])
-        self.axes[1][0].set_ylim(0, max(bins[5:]) * 1.1)
+        ymax = max(bins[5:]) * 1.1 
+        if ymax == 0.0:
+            ymax = 1.0
+        self.axes[1][0].set_ylim(0, ymax)
 
         bins, edges = numpy.histogram(good.B, range=self.ch_range, 
                 bins=self.ch_bins)
@@ -992,7 +1021,15 @@ class Window(QMainWindow):
                                 self.config['B']['filter']['B'], 
                                 falling=False)
 
-                        self.data.append([xa, xb, ta, tb])
+                        if len(xa) > 0:
+                            if len(xb) > 0:
+                                self.data.append([xa[0], xb[0], ta, tb])
+                            else:
+                                self.data.append([xa[0], 0.0, ta, 0.0])
+                        elif len(xb) > 0:
+                            self.data.append([0.0, xb[0.0], 0.0, tb])
+
+                        print(self.data)
                 else:
                     n = self.demo_data.shape[0]
                     self.data.append(self.demo_data[numpy.random.choice(n)])
