@@ -122,6 +122,12 @@ def load_configuration(file_name):
 
                 configuration[name]['calib'] = calib_params
                 configuration[name]['window'] = window_params
+            coin = analysis[0].getElementsByTagName('coincidences')
+            if len(coin) > 0:
+                configuration['coin'] = get_number(
+                                        coin[0].getAttribute('dt'), 1000.0)
+            else:
+                configuration['coin'] = 0.0
 
     except (ValueError, IndexError) as err:
         print(err)
@@ -200,9 +206,9 @@ def trapezoidal(v, params, clock, pileup='max'):
     if pileup == 'all':
         peaks, _ = find_peaks(abs(s / k), prominence=threshold * tau,
                               distance=params['filter']['L'])
-        return abs(s[peaks]) / k, s / k
+        return abs(s[peaks]) / k, s / k, peaks
     else:
-        return [max(abs(s)) / k], s / k
+        return [max(abs(s)) / k], s / k, numpy.argmax(abs(s))
 
 
 
@@ -245,7 +251,7 @@ def zero_crossing(trace, base=15, shift=10, chi=0.6, falling=True):
 
 def amplitude(s, params, clock, pileup='all'):
     if params['filter']['method'] == 'trapezoidal':
-        A, sa = trapezoidal(s, params, clock, pileup)
+        A, sa, pa = trapezoidal(s, params, clock, pileup)
     else:
         baseline = s[0:params['B']].sum() / params['B']
         if params['filter']['method'] == 'sum':

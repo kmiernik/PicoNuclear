@@ -30,7 +30,8 @@ setup(
     package_data={  
         'PicoNuclear': ['data/*.*'],
     },
-    scripts=['src/bin/miniPET.py', 'src/bin/pico_capture.py'],
+    scripts=['src/bin/miniPET.py', 'src/bin/pico_capture.py', 
+             'src/bin/betagamma.py'],
     project_urls={  
         'Bug Reports': 'https://github.com/kmiernik/PicoNuclear/issues'
     }
