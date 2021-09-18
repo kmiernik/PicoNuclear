@@ -1010,9 +1010,9 @@ class Window(QMainWindow):
                                         inverse=True)
                     for i, Ai in enumerate(A):
                         xa = tools.amplitude(A[i, :], self.config['A'],
-                                self.clock)
+                                self.clock, 'max')
                         xb = tools.amplitude(B[i, :], self.config['B'],
-                                self.clock)
+                                self.clock, 'max')
 
                         ta = tools.zero_crossing(A[i, :], 
                                 self.config['A']['filter']['B'], 
@@ -1021,15 +1021,8 @@ class Window(QMainWindow):
                                 self.config['B']['filter']['B'], 
                                 falling=False)
 
-                        if len(xa) > 0:
-                            if len(xb) > 0:
-                                self.data.append([xa[0], xb[0], ta, tb])
-                            else:
-                                self.data.append([xa[0], 0.0, ta, 0.0])
-                        elif len(xb) > 0:
-                            self.data.append([0.0, xb[0.0], 0.0, tb])
+                        self.data.append([xa[0], xb[0], ta, tb])
 
-                        print(self.data)
                 else:
                     n = self.demo_data.shape[0]
                     self.data.append(self.demo_data[numpy.random.choice(n)])
