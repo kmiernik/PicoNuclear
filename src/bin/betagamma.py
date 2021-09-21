@@ -1010,15 +1010,18 @@ class Window(QMainWindow):
                                         timebase=self.config['timebase'], 
                                         inverse=False)
                     for i, Ai in enumerate(A):
-                        xa, sa, pa = trapezoidal(A[i, :], self.config['A'], 
-                                                self.clock, 'all')
+                        xa, sa, pa = tools.trapezoidal(A[i, :], 
+                                                       self.config['A'], 
+                                                       self.clock, 'all')
                         ta = t[pa]
-                        xb, sb, pb = trapezoidal(B[i, :], self.config['B'], 
-                                                self.clock, 'all')
+                        xb, sb, pb = tools.trapezoidal(B[i, :], 
+                                                       self.config['B'], 
+                                                       self.clock, 'all')
                         tb = t[pb]
 
                         used_a = []
                         used_b = []
+                        beta_multi = 50000
                         for ia in range(len(xa)):
                             for ib in range(len(xb)):
                                 if ib in used_b:
@@ -1026,14 +1029,22 @@ class Window(QMainWindow):
                                 if abs(ta[ia] - tb[ib]) < self.coin:
                                     used_a.append(ia)
                                     used_b.append(ib)
-                                    self.data.append([xa[ia], xb[ib], 
+                                    self.data.append([xa[ia], 
+                                                      xb[ib] * beta_multi, 
                                                       ta[ia], tb[ib]])
+                                    print("{:.3e} {:.3e} {:.3e} {:.3e}".format(
+                                        xa[ia], xb[ib], ta[ia], tb[ib]))
                                     break
                             else:
                                 self.data.append([xa[ia], 0.0, ta[ia], 0.0])
+                                print("{:.3e} {:.3e} {:.3e} {:.3e}".format(
+                                    xa[ia], 0.0, ta[ia], -1.0))
                         for ib in range(len(xb)):
                             if ib not in used_b:
-                                self.data.append([0.0, xb[ib], 0.0, tb[ib]])
+                                self.data.append([0.0, xb[ib] * beta_multi, 
+                                                  0.0, tb[ib]])
+                                print("{:.3e} {:.3e} {:.3e} {:.3e}".format(
+                                    0.0, xb[ib], -2.0, tb[ib]))
 
 
                 else:

@@ -9,11 +9,11 @@
     <!-- Parameters for experts -->
     <hardware>
         <samples timebase="1" pre="1000" post="50000" captures="16"
-            ch_range="1024" t_range="1024"/>
+            ch_range="8192" t_range="4096"/>
 
         <channel name="A" coupling="AC" offset="0.0" range="5">
-            <filter L="500" G="500" tau="45000" B="100" method='trapezoidal'
-                    threshold="0.01"/>
+            <filter L="1000" G="1000" tau="45000" B="100" method='trapezoidal'
+                    threshold="0.005"/>
         </channel>
 
         <channel name="B" coupling="AC" offset="0.0" range="0.2">
@@ -21,7 +21,7 @@
                     threshold="0.01"/>
         </channel>
 
-        <trigger source="A" direction="RISING" threshold="0.1"
+        <trigger source="A" direction="RISING" threshold="0.2"
                  autotrigger="1000"/>
     </hardware>
 </config>
